@@ -1,0 +1,13 @@
+[tool.isort]
+profile = "black"
+
+[tool.pylint."FORMAT"]
+max-line-length = 88
+
+[tool.pylint."MESSAGES CONTROL"]
+ignore-paths = ".*/migrations/.*"
+
+[tool.pytest.ini_options]
+testpaths = [
+    "tests",
+]

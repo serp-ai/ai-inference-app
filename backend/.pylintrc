@@ -1,0 +1,14 @@
+[tool.pylint.main]
+# Add files or directories matching the regular expressions patterns to the
+# ignore-list. The regex matches against paths and can be in Posix or Windows
+# format. Because '\\' represents the directory delimiter on Windows systems, it
+# can't be used as an escape character.
+ignore-paths = [".*\\\\migrations\\\\.*|.*/migrations/.*"]
+
+[tool.pylint.format]
+# Maximum number of characters on a single line.
+max-line-length = 88
+
+[MASTER]
+ignore = migrations
+disable = duplicate-code

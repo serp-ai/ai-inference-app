@@ -1,0 +1,17 @@
+version: 3.9
+
+services:
+  backend:
+    image: serpcompany/ai-inference-app:cuda
+    container_name: ai-inference-backend
+    ports:
+      - "8000:8000"
+  frontend:
+    image: serpcompany/ai-inference-app-frontend:1.0.0
+    container_name: ai-inference-frontend
+    ports:
+      - "80:80"
+    environment:
+      - NUXT_PUBLIC_API_BASE=http://host.docker.internal:8000
+    depends_on:
+      - backend

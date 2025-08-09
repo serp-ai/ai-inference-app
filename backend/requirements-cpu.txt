@@ -1,0 +1,8 @@
+# Base requirements for all builds
+-r requirements-base.txt
+
+# PyTorch CPU-only versions
+--index-url https://download.pytorch.org/whl/cpu
+torch==2.5.1
+torchvision==0.20.1
+torchaudio==2.5.1

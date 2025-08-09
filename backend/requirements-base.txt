@@ -1,0 +1,13 @@
+# Base dependencies for ComfyUI backend
+requests==2.32.4
+websocket-client==1.8.0
+fastapi[standard]==0.116.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+pillow==10.1.0
+python-multipart==0.0.18
+aiofiles==23.2.1
+psutil==5.9.6
+GPUtil==1.4.0
+conformer==0.3.2
+s3tokenizer==0.2.0

@@ -1,0 +1,11 @@
+# Base requirements for all builds
+-r requirements-base.txt
+
+# PyTorch with CUDA 12.8 support
+--extra-index-url https://download.pytorch.org/whl/cu128
+torch==2.8.0+cu128
+torchvision==0.23.0+cu128
+torchaudio==2.8.0
+
+# GPU acceleration
+triton==3.4.0
