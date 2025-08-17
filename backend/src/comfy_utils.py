@@ -16,23 +16,31 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 from image_utils import tensor_to_pil
+from model_map import MODEL_MAP
 
 # Add ComfyUI paths and imports
 comfy_dir = Path(os.environ.get("COMFYUI_DIR", "/comfyui"))
+model_dir = comfy_dir / "models"
+if os.getenv("COMFYUI_MODELS_DIR"):
+    model_dir = Path(os.getenv("COMFYUI_MODELS_DIR"))
 
 from comfy_script.runtime.real import *
 
 extra_flags = []
-if not torch.cuda.is_available():
-    print("⚠️ CUDA not available, running in CPU mode")
+
+DEVICE = (
+    "cuda"
+    if torch.cuda.is_available()
+    else ("mps" if torch.backends.mps.is_available() else "cpu")
+)
+
+if DEVICE == "cpu":
+    print("⚠️ Running in CPU mode, inference may be slow")
     extra_flags.append("--cpu")
-if (
-    os.getenv("USE_SAGEATTENTION", "true").lower() == "true"
-    and torch.cuda.is_available()
-):
+if os.getenv("USE_SAGEATTENTION", "false").lower() == "true" and DEVICE == "cuda":
     print("✅ Using SageAttention for better performance")
     extra_flags.append("--use-sage-attention")
-if os.getenv("TORCH_COMPILE", "true").lower() == "true":
+if os.getenv("TORCH_COMPILE", "false").lower() == "true":
     print("✅ Using torch.compile when available for model acceleration")
 
 args = ComfyUIArgs(*extra_flags)
@@ -42,6 +50,23 @@ from comfy_script.runtime.real.nodes import *
 
 sys.path.append(comfy_dir)
 from comfy.model_management import unload_all_models, soft_empty_cache
+
+
+def download_model(model_name: str) -> str:
+    """
+    Download a model from Hugging Face if it doesn't exist locally.
+    """
+    model_info = MODEL_MAP.get(model_name)
+    if not model_info:
+        raise ValueError(f"Model {model_name} not found in MODEL_MAP")
+
+    model_path = model_dir / model_info[0]
+    if not model_path.exists():
+        print(f"Downloading {model_name} to {model_path}")
+        os.makedirs(model_path.parent, exist_ok=True)
+        download_url = model_info[1]
+        torch.hub.download_url_to_file(download_url, str(model_path))
+    return str(model_path)
 
 
 class ModelCache:
@@ -230,12 +255,15 @@ def cached_model(model_type: str, model_name_param: str, subtype_param: str = No
 
 @cached_model("unet", "unet_name")
 def load_unet(unet_name, weight_dtype="default"):
+    download_model(unet_name)
     unet_loader = UNETLoader()
     return unet_loader.load_unet(unet_name=unet_name, weight_dtype=weight_dtype)
 
 
 @cached_model("dual_clip", "clip_name1", "type")
 def load_dual_clip(clip_name1, clip_name2, type="flux"):
+    download_model(clip_name1)
+    download_model(clip_name2)
     dual_clip_loader = DualCLIPLoader()
     return dual_clip_loader.load_clip(
         clip_name1=clip_name1, clip_name2=clip_name2, type=type
@@ -243,19 +271,22 @@ def load_dual_clip(clip_name1, clip_name2, type="flux"):
 
 
 @cached_model("clip", "clip_name", "type")
-def load_clip(clip_name, type="default", device="default"):
+def load_clip(clip_name, type="default"):
+    download_model(clip_name)
     clip_loader = CLIPLoader()
-    return clip_loader.load_clip(clip_name=clip_name, type=type, device=device)
+    return clip_loader.load_clip(clip_name=clip_name, type=type, device=DEVICE)
 
 
 @cached_model("vae", "vae_name")
 def load_vae(vae_name):
+    download_model(vae_name)
     vae_loader = VAELoader()
     return vae_loader.load_vae(vae_name=vae_name)
 
 
 @cached_model("lora_stack", "lora_1_name")
 def load_lora_stack(lora_1_name, lora_1_strength=1.0):
+    download_model(lora_1_name)
     easy_lora_stack = EasyLoraStack()
     return easy_lora_stack.stack(
         toggle=True,
@@ -270,7 +301,6 @@ def load_lora_stack(lora_1_name, lora_1_strength=1.0):
 def load_wan_video_model(
     model_name,
     base_precision="bf16",
-    load_device="offload_device",
     quantization="disabled",
     attention_mode="sageattn",
     block_swap_args=None,
@@ -289,12 +319,13 @@ def load_wan_video_model(
     compile_transformer_blocks_only=True,
     dynamo_recompile_limit=128,
 ):
+    download_model(model_name)
     if (
-        os.getenv("USE_SAGEATTENTION", "true").lower() == "false"
+        os.getenv("USE_SAGEATTENTION", "false").lower() == "false"
         and attention_mode == "sageattn"
     ):
         attention_mode = "default"
-    if compile_model or os.getenv("TORCH_COMPILE", "true").lower() == "true":
+    if compile_model or os.getenv("TORCH_COMPILE", "false").lower() == "true":
         wan_video_torch_compile_settings = WanVideoTorchCompileSettings()
         model_compile_args = wan_video_torch_compile_settings.set_args(
             backend=backend,
@@ -314,7 +345,7 @@ def load_wan_video_model(
     return wan_video_model_loader.loadmodel(
         model=model_name,
         base_precision=base_precision,
-        load_device=load_device,
+        load_device=DEVICE,
         quantization=quantization,
         compile_args=model_compile_args,
         attention_mode=attention_mode,
@@ -329,6 +360,7 @@ def load_wan_video_model(
 
 @cached_model("wan_video_vae", "vae_name")
 def load_wan_video_vae(vae_name, precision="bf16"):
+    download_model(vae_name)
     wan_video_vae_loader = WanVideoVAELoader()
     return wan_video_vae_loader.loadmodel(
         model_name=vae_name, precision=precision, compile_args=None
@@ -336,16 +368,179 @@ def load_wan_video_vae(vae_name, precision="bf16"):
 
 
 @cached_model("wan_video_t5", "model_name")
-def load_wan_video_t5(
-    model_name, precision="bf16", load_device="offload_device", quantization="disabled"
-):
+def load_wan_video_t5(model_name, precision="bf16", quantization="disabled"):
+    download_model(model_name)
     wan_video_t5_text_encoder = LoadWanVideoT5TextEncoder()
     return wan_video_t5_text_encoder.loadmodel(
         model_name=model_name,
         precision=precision,
-        load_device=load_device,
+        load_device=DEVICE,
         quantization=quantization,
     )
+
+
+@cached_model("llm_local", "model_name_or_path")
+def llm_local_loader(model_name_or_path, dtype="auto", is_locked=True):
+    """
+    Load a local LLM model with optional device and dtype settings.
+    """
+    # model files are handled through huggingface, no need to explicitly download here
+    llm_local_loader = LLMLocalLoader()
+    return llm_local_loader.chatbot(
+        model_name_or_path=model_name_or_path,
+        device=DEVICE,
+        dtype=dtype,
+        is_locked=is_locked,
+    )
+
+
+def run_local_llm_inference(
+    model_name_or_path,
+    prompt,
+    system_prompt=None,
+    temperature=0.7,
+    max_length=2048,
+    dtype="auto",
+    is_locked=True,
+    model_type="LLM",  # "LLM", "LLM-GGUF", "VLM-GGUF", "VLM(llama-v)", "VLM(qwen-vl)", "VLM(deepseek-janus-pro)"
+):
+    """
+    Run inference on a local LLM model.
+    """
+    with torch.inference_mode():
+        model, tokenizer = llm_local_loader(
+            model_name_or_path=model_name_or_path,
+            dtype=dtype,
+            is_locked=is_locked,
+        )
+
+        llm_local = LLMLocal()
+        response, history, llm_tools_json, image_out = llm_local.chatbot(
+            user_prompt=prompt,
+            main_brain="enable",
+            system_prompt=system_prompt,
+            model_type=model_type,
+            model=model,
+            tokenizer=tokenizer,
+            temperature=temperature,
+            max_length=max_length,
+            is_memory="disable",
+            is_locked="disable",
+            system_prompt_input="",
+            user_prompt_input="",
+            tools=None,
+            file_content=None,
+            image=None,
+            conversation_rounds=100,
+            historical_record="",
+            is_enable=True,
+            extra_parameters=None,
+            user_history=None,
+        )
+        if "</think>" in response:
+            reasoning_content = response.split("</think>", 1)[0].strip()
+            response = response.split("</think>", 1)[1].strip()
+        else:
+            reasoning_content = ""
+            response = response.strip()
+        return (
+            response,
+            history,
+            llm_tools_json,
+            image_out,
+            reasoning_content,
+        )
+
+
+def run_api_llm_inference(
+    model_name,
+    prompt,
+    system_prompt=None,
+    temperature=0.7,
+    max_length=2048,
+    model_base_url=None,
+    model_api_key=None,
+    is_ollama=False,
+):
+    """
+    Run inference on an API-based LLM model.
+    """
+    with torch.inference_mode():
+        llm_api_loader = LLMApiLoader()
+        model = llm_api_loader.chatbot(
+            model_name=model_name,
+            base_url=model_base_url,
+            api_key=model_api_key,
+            is_ollama=is_ollama,
+        )[0]
+
+        llm = Llm()
+        response, history, llm_tools_json, image_out, reasoning_content = llm.chatbot(
+            user_prompt=prompt,
+            main_brain="enable",
+            system_prompt=system_prompt,
+            model=model,
+            temperature=temperature,
+            is_memory="disable",
+            is_tools_in_sys_prompt="disable",
+            is_locked="disable",
+            max_length=max_length,
+            system_prompt_input="",
+            user_prompt_input="",
+            tools=None,
+            file_content=None,
+            images=None,
+            imgbb_api_key=None,
+            conversation_rounds=100,
+            historical_record="",
+            is_enable=True,
+            extra_parameters=None,
+            user_history=None,
+            img_URL=None,
+            stream=False,
+        )
+        return response, history, llm_tools_json, image_out, reasoning_content
+
+
+def run_llm_inference(
+    model_name_or_path,
+    prompt,
+    system_prompt=None,
+    use_local=True,
+    model_type="LLM",  # "LLM", "LLM-GGUF", "VLM-GGUF", "VLM(llama-v)", "VLM(qwen-vl)", "VLM(deepseek-janus-pro)"
+    temperature=0.7,
+    max_length=2048,
+    model_base_url=None,
+    model_api_key=None,
+    is_ollama=False,
+    dtype="auto",
+    is_locked=True,
+):
+    """
+    Run inference on a local or api-based LLM model.
+    """
+    if use_local:
+        return run_local_llm_inference(
+            model_name_or_path=model_name_or_path,
+            prompt=prompt,
+            system_prompt=system_prompt,
+            temperature=temperature,
+            max_length=max_length,
+            dtype=dtype,
+            is_locked=is_locked,
+            model_type=model_type,
+        )
+    else:
+        return run_api_llm_inference(
+            model_name=model_name_or_path,
+            prompt=prompt,
+            system_prompt=system_prompt,
+            temperature=temperature,
+            max_length=max_length,
+            model_base_url=model_base_url,
+            model_api_key=model_api_key,
+            is_ollama=is_ollama,
+        )
 
 
 def run_qwen_image_inference(
@@ -560,7 +755,7 @@ def run_wan_2_2_video_5B_inference(
             force_offload=True,
             model_to_offload=model,
             use_disk_cache=False,
-            device="gpu",
+            device="gpu" if DEVICE == "cuda" else DEVICE,
         )[0]
 
         wan_video_easy_cache = WanVideoEasyCache()

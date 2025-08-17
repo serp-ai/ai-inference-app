@@ -139,3 +139,35 @@ class VideoRequest(BaseModel):
     width: int = Field(768, ge=64, le=2048, description="Video width")
     height: int = Field(768, ge=64, le=2048, description="Video height")
     seed: Optional[int] = Field(-1, description="Random seed for reproducibility")
+
+
+class LLMRequest(BaseModel):
+    """Request model for LLM inference"""
+
+    model_name_or_path: str = Field(..., description="Model name or path")
+    prompt: str = Field(..., description="User prompt for the model")
+    system_prompt: Optional[str] = Field(None, description="System prompt for the model")
+    use_local: bool = Field(True, description="Whether to use local model (True) or API-based (False)")
+    model_type: str = Field("LLM", description="Model type: LLM, LLM-GGUF, VLM-GGUF, VLM(llama-v), VLM(qwen-vl), VLM(deepseek-janus-pro)")
+    temperature: float = Field(0.7, ge=0.0, le=2.0, description="Temperature for generation")
+    max_length: int = Field(2048, ge=1, le=8192, description="Maximum generation length")
+    
+    # API-based model parameters
+    model_base_url: Optional[str] = Field(None, description="Base URL for API-based model")
+    model_api_key: Optional[str] = Field(None, description="API key for API-based model")
+    is_ollama: bool = Field(False, description="Whether the API is Ollama-based")
+    
+    # Local model parameters
+    device: str = Field("auto", description="Device for local model")
+    dtype: str = Field("auto", description="Data type for local model")
+    is_locked: bool = Field(True, description="Whether to lock the model")
+
+
+class LLMResponse(BaseModel):
+    """Response model for LLM inference"""
+
+    response: str = Field(..., description="Generated text response")
+    history: str = Field(..., description="Conversation history")
+    llm_tools_json: Optional[str] = Field(None, description="LLM tools JSON output")
+    image_out: Optional[str] = Field(None, description="Generated image output if any")
+    reasoning_content: Optional[str] = Field(None, description="Reasoning content if available")

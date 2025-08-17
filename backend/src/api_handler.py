@@ -24,6 +24,8 @@ from models import (
     VideoRequest,
     QwenImageRequest,
     QwenImageResponse,
+    LLMRequest,
+    LLMResponse,
     ErrorResponse,
     ClearCacheResponse,
     LogsResponse,
@@ -37,6 +39,7 @@ from comfy_utils import (
     run_wan_2_2_video_5B_inference,
     run_chatterbox_tts,
     run_qwen_image_inference,
+    run_llm_inference,
 )
 from image_utils import (
     base64_to_comfy_tensor,
@@ -237,6 +240,53 @@ def run_qwen_image_inference_sync(
         return result
     except Exception as e:
         print(f"❌ Qwen image inference failed: {str(e)}", flush=True)
+        sys.stderr.flush()
+        raise
+
+
+def run_llm_inference_sync(
+    model_name_or_path,
+    prompt,
+    system_prompt,
+    use_local,
+    model_type,
+    temperature,
+    max_length,
+    model_base_url,
+    model_api_key,
+    is_ollama,
+    device,
+    dtype,
+    is_locked,
+):
+    """Synchronous wrapper for LLM inference to run in thread pool"""
+    # Force stdout flush to ensure logs appear
+    import sys
+
+    print("🤖 LLM inference starting...", flush=True)
+    sys.stdout.flush()
+
+    try:
+        result = run_llm_inference(
+            model_name_or_path=model_name_or_path,
+            prompt=prompt,
+            system_prompt=system_prompt,
+            use_local=use_local,
+            model_type=model_type,
+            temperature=temperature,
+            max_length=max_length,
+            model_base_url=model_base_url,
+            model_api_key=model_api_key,
+            is_ollama=is_ollama,
+            device=device,
+            dtype=dtype,
+            is_locked=is_locked,
+        )
+        print("✅ LLM inference completed!", flush=True)
+        sys.stdout.flush()
+        return result
+    except Exception as e:
+        print(f"❌ LLM inference failed: {str(e)}", flush=True)
         sys.stderr.flush()
         raise
 
@@ -647,6 +697,73 @@ async def generate_qwen_image(
         ) from e
 
 
+@app.post(
+    "/api/llm/generate",
+    response_model=LLMResponse,
+    responses={500: {"model": ErrorResponse}},
+)
+async def generate_llm_response(
+    request: LLMRequest, _: bool = Depends(verify_api_key)
+):
+    """
+    Generate text response using local or API-based LLM models
+
+    This endpoint processes text prompts using various LLM models including
+    local models (LLM, LLM-GGUF, VLM variants) and API-based models via ComfyUI backend.
+    """
+    try:
+        print("🚀 Starting LLM inference...")
+        print(f"📝 Model: {request.model_name_or_path}")
+        print(f"🔧 Type: {'Local' if request.use_local else 'API'} - {request.model_type}")
+        print(
+            f"📝 Prompt: {request.prompt[:100]}{'...' if len(request.prompt) > 100 else ''}"
+        )
+        print(
+            f"⚙️ Parameters: Temperature={request.temperature}, Max Length={request.max_length}"
+        )
+
+        print("🤖 Loading AI models and starting LLM inference...")
+        loop = asyncio.get_event_loop()
+        response, history, llm_tools_json, image_out, reasoning_content = await loop.run_in_executor(
+            thread_pool,
+            run_llm_inference_sync,
+            request.model_name_or_path,
+            request.prompt,
+            request.system_prompt,
+            request.use_local,
+            request.model_type,
+            request.temperature,
+            request.max_length,
+            request.model_base_url,
+            request.model_api_key,
+            request.is_ollama,
+            request.device,
+            request.dtype,
+            request.is_locked,
+        )
+
+        # Convert any tensor outputs to strings if needed
+        if image_out is not None and hasattr(image_out, 'shape'):
+            image_out = str(image_out)
+
+        llm_response = LLMResponse(
+            response=response,
+            history=history,
+            llm_tools_json=llm_tools_json,
+            image_out=image_out,
+            reasoning_content=reasoning_content,
+        )
+
+        print("✅ LLM inference completed successfully!")
+        return llm_response
+
+    except Exception as e:
+        print(f"❌ LLM inference failed: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"LLM inference failed: {str(e)}"
+        ) from e
+
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint for load balancers and monitoring"""
@@ -691,7 +808,7 @@ if __name__ == "__main__":
     else:
         print("🔓 API Key authentication disabled (set API_KEY env var to enable)")
 
-    print(f"Starting NSFW Clothes Remover API on {host}:{port}")
+    print(f"Starting AI Inference API on {host}:{port}")
 
     # Start server with production settings
     uvicorn.run(

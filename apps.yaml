@@ -1,0 +1,30 @@
+apps:
+  # txt2img:
+  #   image_tag: "labounty/test"
+  #   api_routes: ["/api/qwen-image/generate", "/api/logs", "/api/system/metrics", "/health"]
+  #   pages: ["txt2img"]
+
+  # img2img:
+  #   image_tag: "serpcompany/ai-inference-img2img"
+  #   api_routes: ["/inpaint", "/clear-cache", "/logs", "/metrics"]
+  #   pages: ["img2img"]
+    
+  # video:
+  #   image_tag: "serpcompany/ai-inference-video"  
+  #   api_routes: ["/video", "/clear-cache", "/logs", "/metrics"]
+  #   pages: ["video"]
+    
+  tts:
+    image_tag: "labounty/test-tts"
+    api_routes: ["/api/tts/generate", "/api/logs", "/api/system/metrics", "/health"] 
+    pages: ["tts"]
+
+  # nsfw-clothes-remover:
+  #   image_tag: "serpcompany/ai-inference-nsfw-clothes-remover"
+  #   api_routes: ["/inpaint-clothes-removal", "/clear-cache", "/logs", "/metrics"]
+  #   pages: ["nsfw-clothes-remover"]
+
+  # complete:
+  #   image_tag: "serpcompany/ai-inference-complete"
+  #   api_routes: ["/txt2img", "/inpaint", "/video", "/tts", "/inpaint-clothes-removal", "/clear-cache", "/logs", "/metrics"]
+  #   pages: ["txt2img", "img2img", "video", "tts", "nsfw-clothes-remover"]

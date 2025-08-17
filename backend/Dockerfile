@@ -10,21 +10,25 @@ ARG INCLUDE_WAN_2_2_5B_QUANTIZED_TEXT_ENCODER="false"
 ARG INCLUDE_QWEN_IMAGE="false"
 ARG USE_QUANTIZED_QWEN_IMAGE="true"
 ARG INSTALL_SAGEATTENTION="false"
+ARG USE_TORCH_COMPILE="false"
 ARG PYTHON_VERSION="3.10"
+ARG APP_NAME=""
+ARG TORCH_CUDA_ARCH_LIST=""
 
 
 RUN echo "Requirements file: ${REQUIREMENTS_FILE}" && \
-    echo "Include Flux Kontext: ${INCLUDE_FLUX_KONTEXT}" && \
-    echo "Include Wan 2.2 5B: ${INCLUDE_WAN_2_2_5B}" && \
-    echo "Install SageAttention: ${INSTALL_SAGEATTENTION}"
-
-# TORCH_CUDA_ARCH_LIST="8.0;8.6;8.9;9.0;12.0"
+    echo "Install SageAttention: ${INSTALL_SAGEATTENTION}" && \
+    echo "Python version: ${PYTHON_VERSION}" && \
+    echo "App name: ${APP_NAME}" && \
+    echo "Torch CUDA Arch List: ${TORCH_CUDA_ARCH_LIST}"
 
 ENV DEBIAN_FRONTEND=noninteractive \
    PIP_PREFER_BINARY=1 \
    PYTHONUNBUFFERED=1 \
    CMAKE_BUILD_PARALLEL_LEVEL=8 \
-   TORCH_CUDA_ARCH_LIST="8.9"
+   TORCH_CUDA_ARCH_LIST="${TORCH_CUDA_ARCH_LIST}" \
+   USE_SAGEATTENTION="${INSTALL_SAGEATTENTION}" \
+   TORCH_COMPILE="${USE_TORCH_COMPILE}"
 
 WORKDIR /
 
@@ -176,7 +180,15 @@ RUN git clone https://github.com/kijai/ComfyUI-WanVideoWrapper.git custom_nodes/
 # Custom nodes: ComfyUI-Chatterbox
 RUN git clone https://github.com/wildminder/ComfyUI-Chatterbox.git custom_nodes/ComfyUI-Chatterbox && \
     git -C custom_nodes/ComfyUI-Chatterbox checkout a64e0a14aad8d014e48eaf1d42cf0bbfe592f864 && \
+    sed -i 's/if device in \["cpu", "mps"\]:/if str(device) in ["cpu", "mps"]:/g' \
+      custom_nodes/ComfyUI-Chatterbox/src/chatterbox/tts.py \
+      custom_nodes/ComfyUI-Chatterbox/src/chatterbox/vc.py && \
     pip install --no-cache-dir -r custom_nodes/ComfyUI-Chatterbox/requirements.txt
+
+# Custom nodes: comfyui_LLM_party
+RUN git clone https://github.com/heshengtao/comfyui_LLM_party custom_nodes/comfyui_LLM_party && \
+    git -C custom_nodes/comfyui_LLM_party checkout 5bafb53dc819ad3866969c8286866c590e5b3afd && \
+    pip install --no-cache-dir -r custom_nodes/comfyui_LLM_party/requirements.txt
 
 # Custom nodes: ComfyScript
 RUN git clone https://github.com/Chaoses-Ib/ComfyScript.git custom_nodes/ComfyScript && \
@@ -238,8 +250,6 @@ RUN if [ "${INCLUDE_QWEN_IMAGE}" = "true" ]; then \
     fi && \
     wget -q -O models/vae/qwen_image_vae.safetensors https://huggingface.co/Comfy-Org/Qwen-Image_ComfyUI/resolve/main/split_files/vae/qwen_image_vae.safetensors; \
     fi
-
-COPY models/loras/ models/loras/
 
 WORKDIR /
 
