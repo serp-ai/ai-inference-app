@@ -177,6 +177,11 @@ RUN git clone https://github.com/kijai/ComfyUI-WanVideoWrapper.git custom_nodes/
     git -C custom_nodes/ComfyUI-WanVideoWrapper checkout bacb2a2053000b9bfa3bee89e067994405dc685e && \
     pip install --no-cache-dir -r custom_nodes/ComfyUI-WanVideoWrapper/requirements.txt
 
+# If osx, replace all "torch.float64" with "torch.float32" in custom_nodes/ComfyUI-WanVideoWrapper/wanvideo/modules/model.py
+RUN if [ "${REQUIREMENTS_FILE}" = "requirements-osx.txt" ]; then \
+    sed -i 's/torch.float64/torch.float32/g' custom_nodes/ComfyUI-WanVideoWrapper/wanvideo/modules/model.py; \
+    fi
+
 # Custom nodes: ComfyUI-Chatterbox
 RUN git clone https://github.com/wildminder/ComfyUI-Chatterbox.git custom_nodes/ComfyUI-Chatterbox && \
     git -C custom_nodes/ComfyUI-Chatterbox checkout a64e0a14aad8d014e48eaf1d42cf0bbfe592f864 && \

@@ -324,7 +324,7 @@ def load_wan_video_model(
         os.getenv("USE_SAGEATTENTION", "false").lower() == "false"
         and attention_mode == "sageattn"
     ):
-        attention_mode = "default"
+        attention_mode = "sdpa"
     if compile_model or os.getenv("TORCH_COMPILE", "false").lower() == "true":
         wan_video_torch_compile_settings = WanVideoTorchCompileSettings()
         model_compile_args = wan_video_torch_compile_settings.set_args(
