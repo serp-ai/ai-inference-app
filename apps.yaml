@@ -1,6 +1,6 @@
 apps:
   # txt2img:
-  #   image_tag: "labounty/test"
+  #   image_tag: "serpcompany/ai-inference-txt2img"
   #   api_routes: ["/api/qwen-image/generate", "/api/logs", "/api/system/metrics", "/health"]
   #   pages: ["txt2img"]
 
@@ -15,7 +15,7 @@ apps:
   #   pages: ["video"]
     
   tts:
-    image_tag: "labounty/test-tts"
+    image_tag: "serpcompany/ai-inference-tts"
     api_routes: ["/api/tts/generate", "/api/logs", "/api/system/metrics", "/health"] 
     pages: ["tts"]
 

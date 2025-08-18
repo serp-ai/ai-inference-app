@@ -356,7 +356,9 @@ def build_app_images(
     backend_build_args.append("backend/")
 
     # Build frontend
-    frontend_tag = f"{config['image_tag']}-frontend:{platform_config['tag_suffix']}"
+    tag_suffix = "arm64" if platform == "osx" else "amd64"
+    platform_ = "linux/arm64" if platform == "osx" else "linux/amd64"
+    frontend_tag = f"{config['image_tag']}-frontend:{tag_suffix}"
     frontend_build_args = [
         "docker",
         "buildx",
@@ -366,7 +368,7 @@ def build_app_images(
         "-t",
         frontend_tag,
         "--platform",
-        platform_config["platform"],
+        platform_,
     ]
 
     if push:
@@ -375,8 +377,8 @@ def build_app_images(
 
     # Execute builds
     print(f"Building backend: {backend_tag}")
-    if config.get("compute_capability"):
-        for cc in config["compute_capability"]:
+    if platform_config.get("compute_capability"):
+        for cc in platform_config["compute_capability"]:
             backend_build_args_ = backend_build_args.copy()
             backend_build_args_.extend(["--build-arg", f"TORCH_CUDA_ARCH_LIST={cc}"])
             backend_tag_ = f"{backend_tag}-cc{cc.replace('.', '')}"
@@ -402,6 +404,12 @@ def build_app_images(
 
     if success:
         print(f"✅ Successfully built {app_name} images")
+        if platform_config.get("compute_capability"):
+            tags = [
+                f"{backend_tag}-cc{cc.replace('.', '')}"
+                for cc in platform_config["compute_capability"]
+            ]
+            return tags + [frontend_tag]
         return [backend_tag, frontend_tag]
     else:
         print(f"❌ Failed to build {app_name} images")

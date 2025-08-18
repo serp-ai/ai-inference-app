@@ -2,3 +2,6 @@ comfyui_plugin.log
 images/
 models/
 notebooks/
+
+Dockerfile.*
+api_handler_*.py

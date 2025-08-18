@@ -193,6 +193,7 @@ RUN git clone https://github.com/wildminder/ComfyUI-Chatterbox.git custom_nodes/
 # Custom nodes: comfyui_LLM_party
 RUN git clone https://github.com/heshengtao/comfyui_LLM_party custom_nodes/comfyui_LLM_party && \
     git -C custom_nodes/comfyui_LLM_party checkout 5bafb53dc819ad3866969c8286866c590e5b3afd && \
+    sed -i '/verovio/d' custom_nodes/comfyui_LLM_party/requirements.txt && \
     pip install --no-cache-dir -r custom_nodes/comfyui_LLM_party/requirements.txt
 
 # Custom nodes: ComfyScript
